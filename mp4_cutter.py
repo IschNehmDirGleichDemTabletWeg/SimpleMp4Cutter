@@ -10,7 +10,15 @@ import json
 import tempfile
 import time
 
-CONFIG_FILE = os.path.join(os.path.expanduser("~"), ".mp4cutter_config.json")
+import sys
+
+# Config lives next to the exe (when built) or next to the script (when run as .py)
+if getattr(sys, 'frozen', False):
+    _BASE_DIR = os.path.dirname(sys.executable)
+else:
+    _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+CONFIG_FILE = os.path.join(_BASE_DIR, "mp4cutter_config.json")
 
 # ── Config ──────────────────────────────────────────────────────
 def load_config():
