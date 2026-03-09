@@ -12,11 +12,13 @@ A simple, clean MP4 cutter and joiner with GUI — powered by **ffmpeg** and bui
 ## 📸 Features
 
 - **✂ Cut Mode** — Cut any video by setting a start and end time (precise to milliseconds)
-- **⛓ Join Mode** — Merge two video files with optional re-encoding for a seamless join
+- **⛓ Join Mode** — Merge two video files, with optional re-encoding for a seamless join
+- **GPU Encoder Support** — Choose between CPU (libx264), NVIDIA (h264_nvenc), AMD (h264_amf) or Intel QuickSync (h264_qsv)
+- **Live Progress Window** — See real-time ffmpeg output and elapsed time while processing
+- **CRF Quality Slider** — Control encode quality from 0 (lossless) to 51 (low)
 - **Auto-detect ffmpeg** — or manually point to your `ffmpeg.exe`
 - **Smart file naming** — Output files are automatically named `_part01`, `_part02`, `_joined01` etc. — no overwrites
 - **Config persistence** — All settings saved automatically to `~/.mp4cutter_config.json`
-- **CRF Quality Slider** — When re-encoding, choose quality from 0 (perfect) to 51 (low)
 
 ---
 
@@ -31,17 +33,15 @@ No additional Python packages required — only the standard library + `tkinter`
 
 ## 📦 Installation
 
-1. **Download or clone this repo:**
+1. **Clone this repo:**
    ```bash
    git clone https://github.com/IschNehmDirGleichDemTabletWeg/SimpleMp4Cutter.git
    cd SimpleMp4Cutter
    ```
 
-2. **Make sure ffmpeg is installed.**
-   - Download from [ffmpeg.org](https://ffmpeg.org/download.html)
-   - Either add it to your system PATH, or point to it manually inside the app
+2. **Install ffmpeg** — Download from [ffmpeg.org](https://ffmpeg.org/download.html) and either add it to your system PATH or select it manually inside the app.
 
-3. **Run the app:**
+3. **Run:**
    ```bash
    python mp4_cutter.py
    ```
@@ -50,29 +50,67 @@ No additional Python packages required — only the standard library + `tkinter`
 
 ## 🎬 Usage
 
-### Cut Mode
+### ✂ Cut Mode
+
 | Field | Description |
 |---|---|
-| **Quelldatei** | Source video file |
-| **Zielordner** | Output folder |
+| **Source File** | The video you want to cut |
+| **Output Folder** | Where the cut file is saved |
 | **ffmpeg.exe** | Path to ffmpeg (auto-detected if in PATH) |
-| **Startzeit** | Start time — use `◀ Start` to set to `00:00:00.000` |
-| **Endzeit** | End time — use `⏱ Ende` to auto-read video duration |
+| **Start Time** | Use `◀ Set Start` to set `00:00:00.000` |
+| **End Time** | Use `⏱ Set End` to auto-read video duration via ffprobe |
 
-**Time format:** `HH:MM:SS.mmm` or just seconds like `83.5`
+**Time format:** `HH:MM:SS.mmm` or plain seconds like `83.5`
 
-### Join Mode
-1. Select **Datei 1** and **Datei 2**
-2. Optionally enable **Re-Encoding** and adjust the **CRF slider** for a seamless join
-3. Hit **⛓ ZUSAMMENFÜGEN** — output saves next to Datei 1 as `_joined01.mp4`
-
-> **Tip:** Use Re-Encoding if you notice a small video lag at the join point. CRF 18 = very high quality.
+Output is saved as `originalname_part01.mp4`, `_part02.mp4`, etc.
 
 ---
 
-## ⚙️ ffmpeg auto-detect paths
+### ⛓ Join Mode
 
-The app searches for `ffmpeg.exe` in this order:
+1. Select **File 1** and **File 2**
+2. Optionally enable **Re-Encode** for a seamless join at the cut point
+3. Choose your **encoder** and adjust the **CRF slider**
+4. Hit **⛓ JOIN FILES** — output saves next to File 1 as `_joined01.mp4`
+
+#### Encoder Options
+
+| Encoder | Requires | Speed | Notes |
+|---|---|---|---|
+| `libx264` | CPU only | Slow | Best compatibility |
+| `h264_nvenc` | NVIDIA GPU | Very fast | Requires CUDA driver |
+| `h264_amf` | AMD GPU | Very fast | Requires AMD drivers |
+| `h264_qsv` | Intel GPU | Fast | Requires Intel drivers |
+
+> **Tip:** If you're unsure which GPU encoder to use, try `h264_nvenc` (NVIDIA) first. If it fails, fall back to `libx264`.
+
+---
+
+## 🔨 Build as .exe
+
+To create a standalone Windows executable (no Python required on target machine):
+
+```bash
+pip install pyinstaller
+pyinstaller --onefile --windowed --icon=icon.ico --name="MP4Cutter" mp4_cutter.py
+```
+
+| Flag | Effect |
+|---|---|
+| `--onefile` | Everything packed into a single `.exe` |
+| `--windowed` | No black terminal window on launch |
+| `--icon=icon.ico` | Uses the scissors icon |
+| `--name="MP4Cutter"` | Name of the output file |
+
+Output: `dist\MP4Cutter.exe`
+
+> Note: `dist\` and `build\` folders are already excluded via `.gitignore`
+
+---
+
+
+
+The app searches in this order:
 1. Manually set path in the UI
 2. System `PATH`
 3. `C:\ffmpeg\bin\ffmpeg.exe`
