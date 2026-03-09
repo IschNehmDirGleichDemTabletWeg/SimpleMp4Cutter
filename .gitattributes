@@ -1,0 +1,3 @@
+# Force GitHub to correctly detect languages
+*.md linguist-detectable=false
+*.py linguist-detectable=true
