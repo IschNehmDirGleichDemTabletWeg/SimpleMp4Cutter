@@ -1,4 +1,4 @@
-APP_VERSION = "1.6"
+APP_VERSION = "1.8"
 
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -11,6 +11,9 @@ import json
 import tempfile
 import time
 import sys
+
+# Hide console window on Windows for all subprocess calls
+_NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 from PIL import Image, ImageTk
 
@@ -70,7 +73,7 @@ TEXT      = "#0f1f30"   # dunkles Blau-Grau — gut lesbarer Text
 MUTED     = "#4a6f8f"   # gedämpftes Blau — Labels & Hints
 ENTRY_BG  = "#D6ECFF"   # sehr helles Blau — Eingabefelder
 FONT_LBL  = ("Courier New", 10)
-FONT_BTN  = ("Courier New", 10, "bold")
+FONT_BTN  = ("Courier New", 13, "bold")
 FONT_IN   = ("Courier New", 11)
 FONT_RB   = ("Courier New", 11, "bold")
 FONT_LOG  = ("Courier New", 9)
@@ -161,7 +164,8 @@ def get_video_duration(src):
     try:
         result = subprocess.run(
             [find_ffprobe(), "-v", "error", "-show_entries", "format=duration",
-             "-of", "csv=p=0", src], capture_output=True, text=True)
+             "-of", "csv=p=0", src], capture_output=True, text=True,
+            creationflags=_NO_WINDOW)
         return float(result.stdout.strip())
     except Exception:
         return 0.0
@@ -190,7 +194,8 @@ def load_keyframes(src):
                  "-skip_frame", "nokey",
                  "-show_entries", "frame=pts_time",
                  "-of", "csv=p=0", src],
-                capture_output=True, text=True, timeout=30
+                capture_output=True, text=True, timeout=30,
+                creationflags=_NO_WINDOW
             )
             kf = []
             for line in result.stdout.strip().splitlines():
@@ -261,7 +266,7 @@ def show_frame_at(pos_sec: float):
                 tmp = tf.name
             cmd = [ffmpeg, "-y", "-ss", str(pos_sec), "-i", src,
                    "-frames:v", "1", "-q:v", "2", tmp]
-            subprocess.run(cmd, capture_output=True)
+            subprocess.run(cmd, capture_output=True, creationflags=_NO_WINDOW)
             if os.path.isfile(tmp):
                 img = Image.open(tmp).convert("RGB")
                 img.thumbnail((PREVIEW_W, PREVIEW_H), Image.LANCZOS)
@@ -370,7 +375,7 @@ def cancel_join():
         logging.info("Process cancelled by user")
     progress_bar.config(value=0)
     status_var.set("🚫  Cancelled — Ready")
-    btn_action.config(text="  ⛓  JOIN FILES  ", command=run_join,
+    btn_action.config(text="  ⛓  JOIN FILES (F6)  ", command=run_join,
                       bg="#2e7d32", fg="#000000", state="normal")
 
 def run_ffmpeg_with_progress(cmd, total_secs, on_done):
@@ -385,7 +390,8 @@ def run_ffmpeg_with_progress(cmd, total_secs, on_done):
         _cancelled = False
         try:
             proc = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL,
-                                    text=True, encoding="utf-8", errors="replace")
+                                    text=True, encoding="utf-8", errors="replace",
+                                    creationflags=_NO_WINDOW)
             _current_proc = proc
             last_line = ""
             for line in proc.stderr:
@@ -436,6 +442,14 @@ def run_ffmpeg_with_progress(cmd, total_secs, on_done):
     threading.Thread(target=worker, daemon=True).start()
 
 # ── CUT ─────────────────────────────────────────────────────────
+def _lock_geometry():
+    """Re-apply current window size to prevent tkinter resizing on widget state changes."""
+    root.update_idletasks()
+    w = root.winfo_width()
+    h = root.winfo_height()
+    root.geometry(f"{w}x{h}")
+    root.resizable(False, False)
+
 def run_cut():
     src = var_src.get().strip(); dest = var_dest.get().strip()
     t_start = var_start.get().strip(); t_end = var_end.get().strip()
@@ -458,10 +472,11 @@ def run_cut():
     save_config()
     progress_bar.config(value=0)
     status_var.set("⏳  Cutting…  0%")
-    btn_action.config(state="disabled")
+    btn_action.config(command=lambda: None)
+    _lock_geometry()
     def on_done(success, info):
         progress_bar.config(value=100 if success else 0)
-        btn_action.config(state="normal")
+        btn_action.config(command=run_cut)
         if success:
             status_var.set(f"✅  Done in {info}s  →  {os.path.basename(out_path)}")
         else:
@@ -512,7 +527,7 @@ def run_join():
     def on_done(success, info):
         os.unlink(list_file)
         progress_bar.config(value=100 if success else 0)
-        btn_action.config(text="  ⛓  JOIN FILES  ", command=run_join,
+        btn_action.config(text="  ⛓  JOIN FILES (F6)  ", command=run_join,
                           bg="#2e7d32", fg="#000000", state="normal")
         if success:
             status_var.set(f"✅  Done in {info}s  →  {os.path.basename(out_path)}")
@@ -535,19 +550,87 @@ def browse_src():
     path = filedialog.askopenfilename(title="Select video file",
         filetypes=[("Video", "*.mp4 *.mkv *.mov *.avi *.webm"), ("All files", "*.*")])
     if path:
-        var_src.set(path)
-        if not var_dest.get():
-            var_dest.set(os.path.dirname(path))
-        var_start.set("00:00:00.000")
-        var_end.set("")
-        save_config()
-        status_var.set("⏳  Loading preview…")
-        root.after(100, lambda: load_video_info(path))
+        _load_src(path)
+
+def _load_src(path):
+    var_src.set(path)
+    if not var_dest.get():
+        var_dest.set(os.path.dirname(path))
+    var_start.set("00:00:00.000")
+    var_end.set("")
+    save_config()
+    _update_path_labels()
+    status_var.set("⏳  Loading preview…")
+    root.after(100, lambda: load_video_info(path))
+
+VIDEO_EXTS = {".mp4", ".mkv", ".mov", ".avi", ".webm"}
+
+def shorten_path(path, max_chars=90):
+    """Shorten path from the right — single line."""
+    if not path:
+        return "—"
+    if len(path) <= max_chars:
+        return path
+    return "…" + path[-(max_chars-1):]
+
+def shorten_src_path(path, max_chars=90):
+    """Same as shorten_path — single line, full path+filename from the right."""
+    return shorten_path(path, max_chars)
+
+def _natural_key(s):
+    """Sort key that handles numbers naturally: file9 < file13."""
+    return [int(c) if c.isdigit() else c.lower()
+            for c in re.split(r'(\d+)', s)]
+
+def _get_folder_videos(src):
+    """Return naturally sorted list of video files in the same folder as src."""
+    folder = os.path.dirname(src)
+    return sorted([
+        f for f in os.listdir(folder)
+        if os.path.splitext(f)[1].lower() in VIDEO_EXTS
+    ], key=_natural_key)
+
+def next_file_in_folder():
+    src = var_src.get().strip()
+    if not src or not os.path.isfile(src):
+        browse_src(); return
+    files = _get_folder_videos(src)
+    if not files: return
+    current = os.path.basename(src)
+    try:
+        idx = (files.index(current) + 1) % len(files)
+    except ValueError:
+        idx = 0
+    _load_src(os.path.join(os.path.dirname(src), files[idx]))
+    status_var.set(f"📂  {files[idx]}  ({idx+1}/{len(files)})")
+
+def prev_file_in_folder():
+    src = var_src.get().strip()
+    if not src or not os.path.isfile(src):
+        browse_src(); return
+    files = _get_folder_videos(src)
+    if not files: return
+    current = os.path.basename(src)
+    try:
+        idx = (files.index(current) - 1) % len(files)
+    except ValueError:
+        idx = 0
+    _load_src(os.path.join(os.path.dirname(src), files[idx]))
+    status_var.set(f"📂  {files[idx]}  ({idx+1}/{len(files)})")
+
+def _update_path_labels():
+    try:
+        lbl_src_path.config(text=shorten_src_path(var_src.get()))
+        lbl_dest_path.config(text=shorten_path(var_dest.get()))
+    except Exception:
+        pass  # labels not yet created on startup
 
 def browse_dest():
     path = filedialog.askdirectory(title="Select output folder")
     if path:
-        var_dest.set(path); save_config()
+        var_dest.set(path)
+        save_config()
+        _update_path_labels()
 
 def browse_ffmpeg():
     path = filedialog.askopenfilename(title="Select ffmpeg.exe",
@@ -556,11 +639,14 @@ def browse_ffmpeg():
         var_ffmpeg.set(path); save_config()
         status_var.set(f"✅  ffmpeg set: {path}")
 
-def browse_join(var):
+def browse_join(var, lbl):
     path = filedialog.askopenfilename(title="Select video file",
         filetypes=[("Video", "*.mp4 *.mkv *.mov *.avi *.webm"), ("All files", "*.*")])
     if path:
-        var.set(path); save_config(); status_var.set("")
+        var.set(path)
+        lbl.config(text=shorten_path(path, 90))
+        save_config()
+        status_var.set("")
 
 def set_start_zero():
     """Set start time to current slider position — only if before OUT."""
@@ -616,15 +702,22 @@ def make_btn(parent, text, cmd, color=ACCENT):
                      font=FONT_BTN, relief="flat", cursor="hand2", padx=10, pady=4,
                      activebackground=ACCENT2, activeforeground=TEXT)
 
+def make_icon_btn(parent, text, cmd, color=ACCENT):
+    """Small button for browse icons — minimal padding."""
+    return tk.Button(parent, text=text, command=cmd, bg=color, fg=TEXT,
+                     font=FONT_BTN, relief="flat", cursor="hand2", padx=4, pady=4,
+                     activebackground=ACCENT2, activeforeground=TEXT)
+
 def switch_mode(*_):
     if var_mode.get() == "cut":
         frame_join.pack_forget()
-        file_panel.pack(fill="x", padx=16, pady=(0,4))
-        preview_outer.pack(fill="x", padx=16, pady=(0,4))
-        frame_cut.pack(fill="both", padx=16, pady=(0,4))
+        nav_frame.pack(fill="x", padx=16, pady=(0,2))
+        file_panel.pack(fill="x", padx=16, pady=(0,2))
+        preview_outer.pack(fill="x", padx=16, pady=(0,2))
+        frame_cut.pack(fill="both", padx=16, pady=(0,2))
         btn_frame.pack_forget()
         btn_frame.pack(pady=(4,6))
-        btn_action.config(text="  ✂  CUT & SAVE  ", command=run_cut,
+        btn_action.config(text="  ✂  CUT & SAVE (F5)  ", command=run_cut,
                           bg="#2e7d32", fg="#000000")
         timeline_slider.config(state="normal")
         root.bind("<Left>",  on_key)
@@ -633,10 +726,11 @@ def switch_mode(*_):
         frame_cut.pack_forget()
         preview_outer.pack_forget()
         file_panel.pack_forget()
+        nav_frame.pack_forget()
         frame_join.pack(fill="both", padx=16, pady=(0,4))
         btn_frame.pack_forget()
         btn_frame.pack(pady=(4,6))
-        btn_action.config(text="  ⛓  JOIN FILES  ", command=run_join,
+        btn_action.config(text="  ⛓  JOIN FILES (F6)  ", command=run_join,
                           bg="#2e7d32", fg="#000000")
         timeline_slider.config(state="disabled")
         root.unbind("<Left>")
@@ -742,26 +836,53 @@ for val, label in [("cut", "✂  Cut Movie"), ("join", "⛓  Join Movie")]:
                    activebackground=BG, activeforeground=ACCENT,
                    font=FONT_RB, relief="flat", cursor="hand2").pack(side="left", padx=(0,20))
 
+# ── Prev / Next navigation (centered) ───────────────────────────
+nav_frame = tk.Frame(root, bg=BG)
+nav_frame.pack(fill="x", padx=16, pady=(0,2))
+nav_inner = tk.Frame(nav_frame, bg=BG)
+nav_inner.pack(anchor="center")
+make_btn(nav_inner, "◀ Prev", prev_file_in_folder, ACCENT2).pack(side="left", padx=(0,8))
+make_btn(nav_inner, "Next ▶", next_file_in_folder, ACCENT2).pack(side="left")
+
 # ════════════════════════════════════════════════════════════════
 # SHARED FILE PANEL (above preview, always visible)
 # ════════════════════════════════════════════════════════════════
-file_panel = tk.Frame(root, bg=PANEL, padx=18, pady=10)
-file_panel.pack(fill="x", padx=16, pady=(0,4))
+file_panel = tk.Frame(root, bg=PANEL, padx=12, pady=2)
+file_panel.pack(fill="x", padx=16, pady=(0,2))
 
-make_label(file_panel, "SOURCE FILE").grid(row=0, column=0, columnspan=3, sticky="w", pady=(0,2))
-make_entry(file_panel, var_src).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0,6))
-make_btn(file_panel, "📂 Browse", browse_src, ACCENT2).grid(row=1, column=2, padx=(8,0), pady=(0,6))
+# Row 0: SOURCE FILE label
+src_header = tk.Frame(file_panel, bg=PANEL)
+src_header.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0,1))
+make_label(src_header, "SOURCE FILE").pack(side="left")
 
-make_label(file_panel, "OUTPUT FOLDER").grid(row=2, column=0, columnspan=3, sticky="w", pady=(0,2))
-make_entry(file_panel, var_dest).grid(row=3, column=0, columnspan=2, sticky="ew", pady=(0,6))
-make_btn(file_panel, "📁 Browse", browse_dest, ACCENT2).grid(row=3, column=2, padx=(8,0), pady=(0,6))
+# Row 1: path label + Browse
+lbl_src_path = tk.Label(file_panel, text="—", bg=ENTRY_BG, fg=TEXT,
+                         font=("Arial", 10), anchor="w", padx=6, pady=1,
+                         relief="flat")
+lbl_src_path.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0,1))
+make_icon_btn(file_panel, "📂", browse_src, ACCENT2).grid(row=1, column=2, padx=(6,0), pady=(0,3))
+
+# Row 2: OUTPUT FOLDER label
+make_label(file_panel, "OUTPUT FOLDER").grid(row=2, column=0, columnspan=3, sticky="w", pady=(0,1))
+
+# Row 3: path label + Browse
+lbl_dest_path = tk.Label(file_panel, text="—", bg=ENTRY_BG, fg=TEXT,
+                          font=("Arial", 10), anchor="w", padx=6, pady=1,
+                          relief="flat")
+lbl_dest_path.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(0,2))
+make_icon_btn(file_panel, "📁", browse_dest, ACCENT2).grid(row=3, column=2, padx=(6,0), pady=(0,2))
+
 file_panel.columnconfigure(0, weight=1)
+
+# Init labels from config
+if var_src.get():  lbl_src_path.config(text=shorten_src_path(var_src.get()))
+if var_dest.get(): lbl_dest_path.config(text=shorten_path(var_dest.get()))
 
 # ════════════════════════════════════════════════════════════════
 # VIDEO PREVIEW (always visible in Cut mode)
 # ════════════════════════════════════════════════════════════════
 preview_outer = tk.Frame(root, bg=BG)
-preview_outer.pack(fill="x", padx=16, pady=(0,4))
+preview_outer.pack(fill="x", padx=16, pady=(0,2))
 
 preview_canvas = tk.Canvas(preview_outer, width=PREVIEW_W, height=PREVIEW_H,
                             bg="#c8e6ff", highlightthickness=1,
@@ -775,7 +896,7 @@ preview_canvas.create_text(PREVIEW_W//2, PREVIEW_H//2,
 
 # Timeline scrubber
 timeline_outer = tk.Frame(preview_outer, bg=BG)
-timeline_outer.pack(fill="x", pady=(4,0))
+timeline_outer.pack(fill="x", pady=(2,0))
 
 preview_time_lbl = tk.Label(timeline_outer, text="0.000s  /  0.000s",
                              bg=BG, fg=MUTED, font=("Courier New", 8))
@@ -809,14 +930,14 @@ marker_canvas.pack(fill="x", pady=(2,0))
 marker_canvas.bind("<Configure>", lambda e: draw_timeline_markers())
 
 tk.Label(preview_outer, text="←  drag slider or click to scrub, then set IN / OUT  |  ← → keys jump keyframes",
-         bg=BG, fg=MUTED, font=("Courier New", 8)).pack(pady=(4,0))
+         bg=BG, fg=MUTED, font=("Courier New", 8)).pack(pady=(2,0))
 
 # ════════════════════════════════════════════════════════════════
 # CUT PANEL (time fields only)
 # ════════════════════════════════════════════════════════════════
-frame_cut = tk.Frame(root, bg=PANEL, padx=18, pady=12)
+frame_cut = tk.Frame(root, bg=PANEL, padx=12, pady=6)
 
-tk.Frame(frame_cut, bg=ACCENT2, height=1).grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0,8))
+tk.Frame(frame_cut, bg=PANEL, height=4).grid(row=0, column=0, columnspan=3, sticky="ew")
 
 # Time fields
 time_frame = tk.Frame(frame_cut, bg=PANEL)
@@ -824,10 +945,8 @@ time_frame.grid(row=1, column=0, columnspan=3, sticky="ew")
 tk.Frame(time_frame, bg=PANEL).pack(side="left", expand=True, fill="x")
 
 left = tk.Frame(time_frame, bg=PANEL)
-left.pack(side="left", padx=(0,30))
+left.pack(side="left", padx=(0,20))
 make_label(left, "START TIME").pack(anchor="w")
-tk.Label(left, text="HH:MM:SS.mmm  or  seconds", bg=PANEL, fg=MUTED,
-         font=("Courier New", 7)).pack(anchor="w")
 make_entry(left, var_start, width=22).pack(anchor="w", pady=(2,0))
 btn_row_left = tk.Frame(left, bg=PANEL)
 btn_row_left.pack(anchor="w", pady=(6,0))
@@ -838,10 +957,8 @@ tk.Label(time_frame, text="→", bg=PANEL, fg=ACCENT,
          font=("Courier New", 20, "bold")).pack(side="left", pady=(14,0))
 
 right = tk.Frame(time_frame, bg=PANEL)
-right.pack(side="left", padx=(30,0))
+right.pack(side="left", padx=(20,0))
 make_label(right, "END TIME").pack(anchor="w")
-tk.Label(right, text="HH:MM:SS.mmm  or  seconds", bg=PANEL, fg=MUTED,
-         font=("Courier New", 7)).pack(anchor="w")
 make_entry(right, var_end, width=22).pack(anchor="w", pady=(2,0))
 btn_row_right = tk.Frame(right, bg=PANEL)
 btn_row_right.pack(anchor="w", pady=(6,0))
@@ -849,31 +966,33 @@ make_btn(btn_row_right, "Set OUT ]", set_end_duration, "#b84c00").pack(side="lef
 make_btn(btn_row_right, "🚫", reset_end, ACCENT2).pack(side="left")
 tk.Frame(time_frame, bg=PANEL).pack(side="left", expand=True, fill="x")
 
-tk.Label(frame_cut, text='Examples:  "00:01:23.500"  |  "83.5"  |  "1:23.5"',
-         bg=PANEL, fg=MUTED, font=("Courier New", 8)).grid(
-    row=2, column=0, columnspan=3, pady=(4,0))
+
 frame_cut.columnconfigure(0, weight=1)
 
 # ════════════════════════════════════════════════════════════════
 # JOIN PANEL
 # ════════════════════════════════════════════════════════════════
-frame_join = tk.Frame(root, bg=PANEL, padx=18, pady=12)
+frame_join = tk.Frame(root, bg=PANEL, padx=12, pady=2)
 
-make_label(frame_join, "FILE 1").grid(row=0, column=0, columnspan=3, sticky="w", pady=(0,2))
-make_entry(frame_join, var_join1).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0,6))
-make_btn(frame_join, "📂 Browse", lambda: browse_join(var_join1), ACCENT2).grid(
-    row=1, column=2, padx=(8,0), pady=(0,6))
+make_label(frame_join, "FILE 1").grid(row=0, column=0, columnspan=3, sticky="w", pady=(0,1))
+lbl_join1 = tk.Label(frame_join, text="—", bg=ENTRY_BG, fg=TEXT,
+                      font=("Arial", 10), anchor="w", padx=6, pady=1, relief="flat")
+lbl_join1.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0,1))
+make_icon_btn(frame_join, "📂", lambda: browse_join(var_join1, lbl_join1), ACCENT2).grid(
+    row=1, column=2, padx=(6,0), pady=(0,3))
 
-make_label(frame_join, "FILE 2").grid(row=2, column=0, columnspan=3, sticky="w", pady=(0,2))
-make_entry(frame_join, var_join2).grid(row=3, column=0, columnspan=2, sticky="ew", pady=(0,6))
-make_btn(frame_join, "📂 Browse", lambda: browse_join(var_join2), ACCENT2).grid(
-    row=3, column=2, padx=(8,0), pady=(0,6))
+make_label(frame_join, "FILE 2").grid(row=2, column=0, columnspan=3, sticky="w", pady=(0,1))
+lbl_join2 = tk.Label(frame_join, text="—", bg=ENTRY_BG, fg=TEXT,
+                      font=("Arial", 10), anchor="w", padx=6, pady=1, relief="flat")
+lbl_join2.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(0,1))
+make_icon_btn(frame_join, "📂", lambda: browse_join(var_join2, lbl_join2), ACCENT2).grid(
+    row=3, column=2, padx=(6,0), pady=(0,3))
 
 tk.Label(frame_join, text="Output is saved as  _joined01.mp4  next to File 1.",
          bg=PANEL, fg=MUTED, font=("Courier New", 8)).grid(
-    row=4, column=0, columnspan=3, pady=(6,0))
+    row=4, column=0, columnspan=3, pady=(2,0))
 
-tk.Frame(frame_join, bg=ACCENT2, height=1).grid(row=5, column=0, columnspan=3, sticky="ew", pady=8)
+tk.Frame(frame_join, bg=ACCENT2, height=1).grid(row=5, column=0, columnspan=3, sticky="ew", pady=5)
 
 cb_frame = tk.Frame(frame_join, bg=PANEL)
 cb_frame.grid(row=6, column=0, columnspan=3, sticky="w")
@@ -884,7 +1003,7 @@ tk.Checkbutton(cb_frame, text="Re-Encode  (seamless join, slower — enables opt
                command=toggle_crf).pack(side="left")
 
 enc_frame = tk.Frame(frame_join, bg=PANEL)
-enc_frame.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(8,2))
+enc_frame.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(4,1))
 tk.Label(enc_frame, text="ENCODER:", bg=PANEL, fg=MUTED, font=FONT_LBL).pack(side="left")
 encoder_menu = tk.OptionMenu(enc_frame, var_encoder, *ENCODERS.keys(),
                               command=lambda _: save_config())
@@ -896,7 +1015,7 @@ encoder_menu["menu"].config(bg=ENTRY_BG, fg=TEXT, font=("Courier New", 9),
 encoder_menu.pack(side="left", padx=(8,0), fill="x", expand=True)
 
 crf_frame = tk.Frame(frame_join, bg=PANEL)
-crf_frame.grid(row=8, column=0, columnspan=3, sticky="ew", pady=(4,4))
+crf_frame.grid(row=8, column=0, columnspan=3, sticky="ew", pady=(2,2))
 tk.Label(crf_frame, text="QUALITY  CRF:", bg=PANEL, fg=MUTED,
          font=("Courier New", 9)).pack(side="left")
 crf_slider = tk.Scale(crf_frame, from_=0, to=51, orient="horizontal",
@@ -909,6 +1028,8 @@ tk.Label(crf_frame, text="0=lossless  18=very good  23=good  51=low",
          bg=PANEL, fg=MUTED, font=("Courier New", 7)).pack(side="left")
 
 frame_join.columnconfigure(0, weight=1)
+if var_join1.get(): lbl_join1.config(text=shorten_path(var_join1.get(), 90))
+if var_join2.get(): lbl_join2.config(text=shorten_path(var_join2.get(), 90))
 
 # ── Default: show CUT panel ──────────────────────────────────────
 frame_cut.pack(fill="both", padx=16, pady=(0,4))
@@ -917,7 +1038,7 @@ toggle_crf()
 # ── Action button ────────────────────────────────────────────────
 btn_frame = tk.Frame(root, bg=BG)
 btn_frame.pack(pady=(4,6))
-btn_action = make_btn(btn_frame, "  ✂  CUT & SAVE  ", run_cut, color="#2e7d32")
+btn_action = make_btn(btn_frame, "  ✂  CUT & SAVE (F5)  ", run_cut, color="#2e7d32")
 btn_action.config(fg="#000000")
 btn_action.pack(ipadx=20, ipady=6)
 
@@ -942,6 +1063,8 @@ tk.Label(status_bar, textvariable=status_var, bg=ACCENT2, fg=TEXT,
 # ── Keyboard shortcuts ───────────────────────────────────────────
 root.bind("<Left>",  on_key)
 root.bind("<Right>", on_key)
+root.bind("<F5>", lambda e: run_cut())
+root.bind("<F6>", lambda e: run_join())
 
 # ── Window position ──────────────────────────────────────────────
 def set_window_position():
@@ -968,6 +1091,7 @@ def on_window_move(event):
     _move_job = root.after(500, save_config)
 
 root.bind("<Configure>", on_window_move)
+root.after(200, _lock_geometry)
 set_window_position()
 
 # ── Load preview if src already in config ────────────────────────
