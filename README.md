@@ -6,7 +6,7 @@ A simple, clean MP4 cutter and joiner with GUI — powered by **ffmpeg** and bui
 ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey?logo=windows)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![ffmpeg](https://img.shields.io/badge/Powered%20by-ffmpeg-orange?logo=ffmpeg)
-![Version](https://img.shields.io/badge/Version-1.4-brightgreen)
+![Version](https://img.shields.io/badge/Version-1.7-brightgreen)
 
 ---
 
@@ -17,48 +17,18 @@ A simple, clean MP4 cutter and joiner with GUI — powered by **ffmpeg** and bui
 - **🎬 Video Preview** — Live frame preview with timeline scrubber directly in the app
 - **⌨ Keyframe Navigation** — Jump between keyframes with ← → arrow keys
 - **🖱 Click-to-Jump** — Click anywhere on the timeline to jump to that position
-- **[ IN / OUT ]** — Set cut points directly from the timeline with IN/OUT marker buttons
+- **[ IN / OUT ]** — Set cut points directly from the timeline, with silent validation (IN always < OUT)
 - **🚫 Reset Buttons** — Reset start/end times back to defaults with one click
 - **GPU Encoder Support** — Choose between CPU (libx264), NVIDIA (h264_nvenc), AMD (h264_amf) or Intel QuickSync (h264_qsv)
-- **Live Progress Window** — See real-time ffmpeg output and elapsed time while processing
+- **Inline Progress Bar** — Percentage and elapsed time shown in the status bar — no popup window
+- **🚫 Cancel Join** — Button turns yellow during join and allows cancelling mid-process
+- **Log File** — All ffmpeg output written to `mp4cutter.log` next to the exe
 - **CRF Quality Slider** — Control encode quality from 0 (lossless) to 51 (low)
 - **✅ ffmpeg Status** — Header shows ffmpeg status at a glance — click ⚙ to set path manually
 - **Auto-detect ffmpeg** — Prompts automatically on first start if ffmpeg is not found
 - **Window position memory** — App reopens exactly where you left it
 - **Smart file naming** — Output files are automatically named `_part01`, `_part02`, `_joined01` etc. — no overwrites
 - **Config persistence** — All settings saved automatically next to the exe
-
----
-
-## 🚀 Requirements
-
-- Python 3.8+
-- [ffmpeg](https://ffmpeg.org/download.html) (includes `ffprobe`)
-- Pillow (`pip install Pillow`)
-
-No other Python packages required.
-
----
-
-## 📦 Installation
-
-1. **Clone this repo:**
-   ```bash
-   git clone https://github.com/IschNehmDirGleichDemTabletWeg/SimpleMp4Cutter.git
-   cd SimpleMp4Cutter
-   ```
-
-2. **Install Pillow:**
-   ```bash
-   pip install Pillow
-   ```
-
-3. **Install ffmpeg** — Download from [ffmpeg.org](https://ffmpeg.org/download.html) and either add it to your system PATH or select it manually inside the app (the app will ask on first start if it can't find it).
-
-4. **Run:**
-   ```bash
-   python mp4_cutter.py
-   ```
 
 ---
 
@@ -72,10 +42,8 @@ No other Python packages required.
 | **Output Folder** | Where the cut file is saved |
 | **Timeline** | Scrub through the video — click anywhere or drag |
 | **← →** | Jump between keyframes with arrow keys |
-| **[ Set IN point** | Sets the start time to the current timeline position |
-| **Set OUT point ]** | Sets the end time to the current timeline position |
-| **◀ Set Start** | Sets start time to `00:00:00.000` |
-| **⏱ Set End** | Auto-reads video duration via ffprobe |
+| **[ Set IN** | Sets start time to current timeline position (only if < OUT) |
+| **Set OUT ]** | Sets end time to current timeline position (only if > IN) |
 | **🚫** | Resets start to `00:00:00.000` / clears end time |
 
 **Time format:** `HH:MM:SS.mmm` or plain seconds like `83.5`
@@ -118,28 +86,6 @@ Click **⚙** to manually select your `ffmpeg.exe`.
 
 ---
 
-## 🔨 Build as .exe
-
-To create a standalone Windows executable (no Python required on target machine):
-
-```bash
-pip install pyinstaller
-python -m PyInstaller --onefile --windowed --icon=icon.ico --name="MP4Cutter" mp4_cutter.py
-```
-
-| Flag | Effect |
-|---|---|
-| `--onefile` | Everything packed into a single `.exe` |
-| `--windowed` | No black terminal window on launch |
-| `--icon=icon.ico` | Uses the scissors icon |
-| `--name="MP4Cutter"` | Name of the output file |
-
-Output: `dist\MP4Cutter.exe`
-
-> Note: `dist\` and `build\` folders are already excluded via `.gitignore`
-
----
-
 ## 🗺 Roadmap
 
 | Version | Feature |
@@ -149,6 +95,9 @@ Output: `dist\MP4Cutter.exe`
 | ✅ v1.2 | Video preview, timeline scrubber, IN/OUT markers, keyframe navigation |
 | ✅ v1.3 | Click-to-jump on timeline, ffmpeg auto-prompt on first start |
 | ✅ v1.4 | Window position memory, reset buttons for start/end time |
+| ✅ v1.5 | New warm light blue/orange theme — easier on the eyes |
+| ✅ v1.6 | Inline progress bar, cancel join button, log file, layout & UX polish |
+| ✅ v1.7 | Fix terminal window flashing on Windows, disable logging |
 | 🔜 v2.0 | Fine-tune cut mode — frame-accurate cut point selection |
 
 ---
@@ -164,6 +113,8 @@ SimpleMp4Cutter/
 ├── .gitignore          # Git ignore rules
 └── LICENSE             # MIT License
 ```
+
+> `mp4cutter.log` and `mp4cutter_config.json` are created automatically next to the exe and are excluded from git.
 
 ---
 
