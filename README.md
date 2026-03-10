@@ -9,6 +9,8 @@ A simple, clean MP4 cutter and joiner with GUI — powered by **ffmpeg** and bui
 ![Version](https://img.shields.io/badge/Version-1.7-brightgreen)
 
 ---
+<img width="676" height="955" alt="grafik" src="https://github.com/user-attachments/assets/adc5aa04-502e-484c-b44c-2e88021724e0" />
+<img width="655" height="502" alt="grafik" src="https://github.com/user-attachments/assets/636172b7-10f6-4f71-85e5-606d13fa8749" />
 
 ## 📸 Features
 
