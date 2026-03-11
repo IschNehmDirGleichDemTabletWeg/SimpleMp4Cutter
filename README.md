@@ -6,7 +6,7 @@ A simple, clean MP4 cutter and joiner with GUI — powered by **ffmpeg** and bui
 ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey?logo=windows)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![ffmpeg](https://img.shields.io/badge/Powered%20by-ffmpeg-orange?logo=ffmpeg)
-![Version](https://img.shields.io/badge/Version-1.7-brightgreen)
+![Version](https://img.shields.io/badge/Version-1.9-brightgreen)
 
 ---
 <img width="676" height="955" alt="grafik" src="https://github.com/user-attachments/assets/adc5aa04-502e-484c-b44c-2e88021724e0" />
@@ -24,7 +24,8 @@ A simple, clean MP4 cutter and joiner with GUI — powered by **ffmpeg** and bui
 - **GPU Encoder Support** — Choose between CPU (libx264), NVIDIA (h264_nvenc), AMD (h264_amf) or Intel QuickSync (h264_qsv)
 - **Inline Progress Bar** — Percentage and elapsed time shown in the status bar — no popup window
 - **🚫 Cancel Join** — Button turns yellow during join and allows cancelling mid-process
-- **Log File** — All ffmpeg output written to `mp4cutter.log` next to the exe
+- **⏮⏭ Prev/Next Navigation** — Browse through all videos in the same folder with Prev/Next buttons
+- **📂 Dynamic Path Labels** — Long paths are automatically shortened, always showing the filename
 - **CRF Quality Slider** — Control encode quality from 0 (lossless) to 51 (low)
 - **✅ ffmpeg Status** — Header shows ffmpeg status at a glance — click ⚙ to set path manually
 - **Auto-detect ffmpeg** — Prompts automatically on first start if ffmpeg is not found
@@ -100,7 +101,10 @@ Click **⚙** to manually select your `ffmpeg.exe`.
 | ✅ v1.5 | New warm light blue/orange theme — easier on the eyes |
 | ✅ v1.6 | Inline progress bar, cancel join button, log file, layout & UX polish |
 | ✅ v1.7 | Fix terminal window flashing on Windows, disable logging |
+| ✅ v1.8 | Prev/Next file navigation, dynamic path labels, smaller buttons, new scissors icon |
+| ✅ v1.9 | Compact layout, START/END inline with time fields, clean marker labels |
 | 🔜 v2.0 | Fine-tune cut mode — frame-accurate cut point selection |
+| 🔜 v3.0 | Linux & Mac compatibility |
 
 ---
 

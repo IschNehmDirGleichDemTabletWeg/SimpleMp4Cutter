@@ -1,0 +1,14 @@
+{
+  "ffmpeg": "D:/1_SETUP/ffmpeg/ffmpeg-2026-03-09-git-9b7439c31b-full_build/bin/ffmpeg.exe",
+  "src": "C:/Users/Admin/Videos/Captures/Super langer Pfad Name mit den Urlaubs videos/01_Mega Langer Dateiname der \u00fcber 100 Zeichen und kein Ende hat was es schwer macht ihn zu lesen \u2013 Teil 1_part01.mp4",
+  "dest": "C:/Users/Admin/Videos/Captures/Super langer Pfad Name mit den Urlaubs videos",
+  "start": "00:00:00.000",
+  "end": "00:14:43.356",
+  "join1": "C:/Users/Admin/Videos/Captures/Super langer Pfad Name mit den Urlaubs videos/01_Mega Langer Dateiname der \u00fcber 100 Zeichen und kein Ende hat was es schwer macht ihn zu lesen \u2013 Teil 1_part01.mp4",
+  "join2": "C:/Users/Admin/Videos/Captures/Super langer Pfad Name mit den Urlaubs videos/01_Mega Langer Dateiname der \u00fcber 100 Zeichen und kein Ende hat was es schwer macht ihn zu lesen \u2013 Teil 1_part01.mp4",
+  "encoder": "GPU \u2014 h264_nvenc  (NVIDIA, fast)",
+  "reencode": true,
+  "crf": 23,
+  "win_x": 383,
+  "win_y": 125
+}
