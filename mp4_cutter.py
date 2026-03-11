@@ -1,4 +1,4 @@
-APP_VERSION = "1.8"
+APP_VERSION = "1.9"
 
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -73,7 +73,7 @@ TEXT      = "#0f1f30"   # dunkles Blau-Grau — gut lesbarer Text
 MUTED     = "#4a6f8f"   # gedämpftes Blau — Labels & Hints
 ENTRY_BG  = "#D6ECFF"   # sehr helles Blau — Eingabefelder
 FONT_LBL  = ("Courier New", 10)
-FONT_BTN  = ("Courier New", 13, "bold")
+FONT_BTN  = ("Courier New", 11, "bold")
 FONT_IN   = ("Courier New", 11)
 FONT_RB   = ("Courier New", 11, "bold")
 FONT_LOG  = ("Courier New", 9)
@@ -331,7 +331,7 @@ def draw_timeline_markers():
         in_sec = hms_to_secs(var_start.get())
         x_in = int(in_sec / _video_duration * w)
         marker_canvas.create_line(x_in, 0, x_in, 22, fill=IN_COLOR, width=3)
-        marker_canvas.create_text(x_in+5, 4, text="IN", fill=IN_COLOR,
+        marker_canvas.create_text(x_in+5, 4, text="<-", fill=IN_COLOR,
                                   font=("Courier New", 9, "bold"), anchor="nw")
     except Exception:
         pass
@@ -341,7 +341,7 @@ def draw_timeline_markers():
         out_sec = hms_to_secs(var_end.get())
         x_out = int(out_sec / _video_duration * w)
         marker_canvas.create_line(x_out, 0, x_out, 22, fill=OUT_COLOR, width=3)
-        marker_canvas.create_text(x_out-5, 4, text="OUT", fill=OUT_COLOR,
+        marker_canvas.create_text(x_out-5, 4, text="->", fill=OUT_COLOR,
                                   font=("Courier New", 9, "bold"), anchor="ne")
     except Exception:
         pass
@@ -360,9 +360,7 @@ def draw_timeline_markers():
 
 # ── Progress (inline, no popup) ──────────────────────────────────
 import logging
-
-LOG_FILE = os.path.join(_BASE_DIR, "mp4cutter.log")
-logging.basicConfig(filename=LOG_FILE, level=logging.CRITICAL)  # logging disabled
+logging.disable(logging.CRITICAL)  # logging disabled — no log file created
 
 _current_proc   = None  # running ffmpeg process — for cancel
 _cancelled      = False # flag to suppress on_done after cancel
@@ -472,8 +470,6 @@ def run_cut():
     save_config()
     progress_bar.config(value=0)
     status_var.set("⏳  Cutting…  0%")
-    btn_action.config(command=lambda: None)
-    _lock_geometry()
     def on_done(success, info):
         progress_bar.config(value=100 if success else 0)
         btn_action.config(command=run_cut)
@@ -699,13 +695,13 @@ def make_entry(parent, textvariable, width=52):
 
 def make_btn(parent, text, cmd, color=ACCENT):
     return tk.Button(parent, text=text, command=cmd, bg=color, fg=TEXT,
-                     font=FONT_BTN, relief="flat", cursor="hand2", padx=10, pady=4,
+                     font=FONT_BTN, relief="flat", cursor="hand2", padx=6, pady=2,
                      activebackground=ACCENT2, activeforeground=TEXT)
 
 def make_icon_btn(parent, text, cmd, color=ACCENT):
     """Small button for browse icons — minimal padding."""
     return tk.Button(parent, text=text, command=cmd, bg=color, fg=TEXT,
-                     font=FONT_BTN, relief="flat", cursor="hand2", padx=4, pady=4,
+                     font=FONT_BTN, relief="flat", cursor="hand2", padx=2, pady=2,
                      activebackground=ACCENT2, activeforeground=TEXT)
 
 def switch_mode(*_):
@@ -929,7 +925,7 @@ marker_canvas = tk.Canvas(preview_outer, height=22, bg=PANEL,
 marker_canvas.pack(fill="x", pady=(2,0))
 marker_canvas.bind("<Configure>", lambda e: draw_timeline_markers())
 
-tk.Label(preview_outer, text="←  drag slider or click to scrub, then set IN / OUT  |  ← → keys jump keyframes",
+tk.Label(preview_outer, text="←  drag slider or click to scrub  |  ← → keys jump keyframes",
          bg=BG, fg=MUTED, font=("Courier New", 8)).pack(pady=(2,0))
 
 # ════════════════════════════════════════════════════════════════
@@ -944,27 +940,21 @@ time_frame = tk.Frame(frame_cut, bg=PANEL)
 time_frame.grid(row=1, column=0, columnspan=3, sticky="ew")
 tk.Frame(time_frame, bg=PANEL).pack(side="left", expand=True, fill="x")
 
-left = tk.Frame(time_frame, bg=PANEL)
-left.pack(side="left", padx=(0,20))
-make_label(left, "START TIME").pack(anchor="w")
-make_entry(left, var_start, width=22).pack(anchor="w", pady=(2,0))
-btn_row_left = tk.Frame(left, bg=PANEL)
-btn_row_left.pack(anchor="w", pady=(6,0))
-make_btn(btn_row_left, "[ Set IN", set_start_zero, "#2e7d32").pack(side="left", padx=(0,4))
-make_btn(btn_row_left, "🚫", reset_start, "#b84c00").pack(side="left")
+single_row = tk.Frame(time_frame, bg=PANEL)
+single_row.pack(side="left", expand=True, fill="x")
 
-tk.Label(time_frame, text="→", bg=PANEL, fg=ACCENT,
-         font=("Courier New", 20, "bold")).pack(side="left", pady=(14,0))
+make_label(single_row, "START").pack(side="left", padx=(0,4))
+make_entry(single_row, var_start, width=14).pack(side="left")
+make_btn(single_row, "Start", set_start_zero, "#2e7d32").pack(side="left", padx=(6,2))
+make_btn(single_row, "🚫", reset_start, "#b84c00").pack(side="left", padx=(0,10))
 
-right = tk.Frame(time_frame, bg=PANEL)
-right.pack(side="left", padx=(20,0))
-make_label(right, "END TIME").pack(anchor="w")
-make_entry(right, var_end, width=22).pack(anchor="w", pady=(2,0))
-btn_row_right = tk.Frame(right, bg=PANEL)
-btn_row_right.pack(anchor="w", pady=(6,0))
-make_btn(btn_row_right, "Set OUT ]", set_end_duration, "#b84c00").pack(side="left", padx=(0,4))
-make_btn(btn_row_right, "🚫", reset_end, ACCENT2).pack(side="left")
-tk.Frame(time_frame, bg=PANEL).pack(side="left", expand=True, fill="x")
+tk.Label(single_row, text="→", bg=PANEL, fg=ACCENT,
+         font=("Courier New", 16, "bold")).pack(side="left", padx=(0,10))
+
+make_btn(single_row, "End", set_end_duration, "#b84c00").pack(side="left", padx=(0,2))
+make_btn(single_row, "🚫", reset_end, ACCENT2).pack(side="left", padx=(0,6))
+make_entry(single_row, var_end, width=14).pack(side="left")
+make_label(single_row, "END").pack(side="left", padx=(4,0))
 
 
 frame_cut.columnconfigure(0, weight=1)
@@ -1040,7 +1030,7 @@ btn_frame = tk.Frame(root, bg=BG)
 btn_frame.pack(pady=(4,6))
 btn_action = make_btn(btn_frame, "  ✂  CUT & SAVE (F5)  ", run_cut, color="#2e7d32")
 btn_action.config(fg="#000000")
-btn_action.pack(ipadx=20, ipady=6)
+btn_action.pack(ipadx=10, ipady=3)
 
 # ── Status bar + Progressbar ─────────────────────────────────────
 status_bar = tk.Frame(root, bg=ACCENT2, height=28)
