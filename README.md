@@ -11,6 +11,8 @@ A simple, clean MP4 cutter and joiner with GUI — powered by **ffmpeg** and bui
 ---
 <img width="676" height="830" alt="grafik" src="https://github.com/user-attachments/assets/27346dd5-7a80-44ae-a1ff-5f80e7524b19" />
 <img width="676" height="830" alt="grafik" src="https://github.com/user-attachments/assets/05410086-2654-4661-bac3-8bf4f198707a" />
+<img width="676" height="830" alt="grafik" src="https://github.com/user-attachments/assets/12e41de8-4cdb-4371-9075-5b990b36bff1" />
+
 
 
 ## 📸 Features
