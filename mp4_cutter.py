@@ -96,6 +96,167 @@ ENCODERS = {
                                                                "-look_ahead", "1"]),
 }
 
+# ── Tooltip ──────────────────────────────────────────────────────
+class Tooltip:
+    """Hover tooltip for the Shortcuts… label — shows all keybindings."""
+    SHORTCUTS = [
+        "── Global ──────────────────────────",
+        "F1             = Switch to Cut mode",
+        "F2             = Switch to Join mode",
+        "F5             = Cut & Save",
+        "F6             = Join Files",
+        "── Cut mode ────────────────────────",
+        "S              = Browse Source file",
+        "O              = Browse Output folder",
+        "← / →         = Jump 1 keyframe",
+        "Ctrl+← / →   = Jump 10 keyframes",
+        "Home          = Set IN point (Start)",
+        "End            = Set OUT point (End)",
+        "Page Up      = Previous file in folder",
+        "Page Down  = Next file in folder",
+        "── Join mode ───────────────────────",
+        "1              = Open File 1",
+        "2              = Open File 2",
+        "R              = Toggle Re-Encode",
+        "E              = Open Encoder dropdown",
+        "Q              = Focus CRF slider",
+    ]
+
+    def __init__(self, widget):
+        self.widget  = widget
+        self.tip_win = None
+        self._poll   = None
+        widget.bind("<Enter>", self.show)
+        widget.bind("<Leave>", self.hide)
+
+    def show(self, event=None):
+        if self.tip_win:
+            return
+        x = self.widget.winfo_rootx()
+        y = self.widget.winfo_rooty() - (len(self.SHORTCUTS) * 18 + 16)
+        self.tip_win = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+        tw.bind("<Enter>", lambda e: None)
+        tw.bind("<Leave>", self.hide)
+        frame = tk.Frame(tw, bg="#E3CEAB", bd=1, relief="solid")
+        frame.pack()
+        for line in self.SHORTCUTS:
+            tk.Label(frame, text=line, bg="#E3CEAB", fg="#000000",
+                     font=("Courier New", 9), anchor="w", padx=10, pady=1
+                     ).pack(fill="x")
+        self._start_poll()
+
+    def _start_poll(self):
+        if not self.tip_win:
+            return
+        try:
+            mx = self.widget.winfo_pointerx()
+            my = self.widget.winfo_pointery()
+            wx1 = self.widget.winfo_rootx(); wy1 = self.widget.winfo_rooty()
+            wx2 = wx1 + self.widget.winfo_width(); wy2 = wy1 + self.widget.winfo_height()
+            over_widget = wx1 <= mx <= wx2 and wy1 <= my <= wy2
+            over_tip = False
+            if self.tip_win:
+                tx1 = self.tip_win.winfo_rootx(); ty1 = self.tip_win.winfo_rooty()
+                tx2 = tx1 + self.tip_win.winfo_width(); ty2 = ty1 + self.tip_win.winfo_height()
+                over_tip = tx1 <= mx <= tx2 and ty1 <= my <= ty2
+            if not over_widget and not over_tip:
+                self._destroy(); return
+        except Exception:
+            self._destroy(); return
+        self._poll = self.widget.after(200, self._start_poll)
+
+    def _destroy(self):
+        if self._poll:
+            try: self.widget.after_cancel(self._poll)
+            except Exception: pass
+            self._poll = None
+        if self.tip_win:
+            try: self.tip_win.destroy()
+            except Exception: pass
+            self.tip_win = None
+
+    def hide(self, event=None):
+        self._destroy()
+
+# ── SimpleTooltip (individual widget hints) ──────────────────────
+class SimpleTooltip:
+    """Single or multi-line tooltip for individual widgets."""
+    _active = []   # alle offenen Tooltips — für globales Cleanup
+
+    def __init__(self, widget, text):
+        self.widget  = widget
+        self.text    = text
+        self.tip_win = None
+        self._poll   = None
+        widget.bind("<Enter>", self.show)
+        widget.bind("<Leave>", self.hide)
+
+    def show(self, event=None):
+        if self.tip_win:
+            return
+        x = self.widget.winfo_rootx()
+        y = self.widget.winfo_rooty() - (self.text.count("\n") + 1) * 18 - 8
+        self.tip_win = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+        tw.bind("<Enter>", lambda e: None)
+        tw.bind("<Leave>", self.hide)
+        frame = tk.Frame(tw, bg="#E3CEAB", bd=1, relief="solid")
+        frame.pack()
+        for line in self.text.split("\n"):
+            tk.Label(frame, text=line, bg="#E3CEAB", fg="#000000",
+                     font=("Courier New", 9), anchor="w", padx=8, pady=1
+                     ).pack(fill="x")
+        SimpleTooltip._active.append(self)
+        self._start_poll()
+
+    def _start_poll(self):
+        """Poll every 200ms — destroy if mouse has left both widget and tooltip."""
+        if not self.tip_win:
+            return
+        try:
+            mx = self.widget.winfo_pointerx()
+            my = self.widget.winfo_pointery()
+            wx1 = self.widget.winfo_rootx()
+            wy1 = self.widget.winfo_rooty()
+            wx2 = wx1 + self.widget.winfo_width()
+            wy2 = wy1 + self.widget.winfo_height()
+            over_widget = wx1 <= mx <= wx2 and wy1 <= my <= wy2
+            over_tip = False
+            if self.tip_win:
+                tx1 = self.tip_win.winfo_rootx()
+                ty1 = self.tip_win.winfo_rooty()
+                tx2 = tx1 + self.tip_win.winfo_width()
+                ty2 = ty1 + self.tip_win.winfo_height()
+                over_tip = tx1 <= mx <= tx2 and ty1 <= my <= ty2
+            if not over_widget and not over_tip:
+                self._destroy()
+                return
+        except Exception:
+            self._destroy()
+            return
+        self._poll = self.widget.after(200, self._start_poll)
+
+    def _destroy(self):
+        if self._poll:
+            try: self.widget.after_cancel(self._poll)
+            except Exception: pass
+            self._poll = None
+        if self.tip_win:
+            try: self.tip_win.destroy()
+            except Exception: pass
+            self.tip_win = None
+        try: SimpleTooltip._active.remove(self)
+        except ValueError: pass
+
+    def hide(self, event=None):
+        self._destroy()
+
+def tip(widget, text):
+    SimpleTooltip(widget, text)
+
 # ── ffmpeg helpers ───────────────────────────────────────────────
 def find_ffmpeg():
     import shutil
@@ -205,7 +366,7 @@ def load_keyframes(src):
                     pass
             _keyframes = sorted(set(kf))
             root.after(0, lambda: status_var.set(
-                f"✅  Preview ready  —  {len(_keyframes)} keyframes found"))
+                f"✅  Preview ready = {len(_keyframes)} keyframes found"))
         except Exception:
             _keyframes = []
     threading.Thread(target=worker, daemon=True).start()
@@ -221,33 +382,34 @@ def load_video_info(src):
         status_var.set("⏳  Loading keyframes…")
         load_keyframes(src)
 
-def jump_to_keyframe(direction: int):
-    """Jump to next (+1) or previous (-1) keyframe from current position."""
+def jump_to_keyframe(direction: int, steps: int = 1):
+    """Jump forward/backward by <steps> keyframes. direction: +1 or -1."""
     if not _keyframes:
-        # No keyframes loaded yet — jump by 1 second as fallback
-        pos = timeline_slider.get() + direction
+        pos = timeline_slider.get() + direction * steps
         pos = max(0, min(_video_duration, pos))
         timeline_slider.set(pos)
         show_frame_at(pos)
         return
     pos = timeline_slider.get()
-    if direction > 0:
-        # next keyframe after current position
-        candidates = [k for k in _keyframes if k > pos + 0.001]
-        target = candidates[0] if candidates else _keyframes[-1]
-    else:
-        # previous keyframe before current position
-        candidates = [k for k in _keyframes if k < pos - 0.001]
-        target = candidates[-1] if candidates else _keyframes[0]
+    target = pos
+    for _ in range(steps):
+        if direction > 0:
+            candidates = [k for k in _keyframes if k > target + 0.001]
+            target = candidates[0] if candidates else _keyframes[-1]
+        else:
+            candidates = [k for k in _keyframes if k < target - 0.001]
+            target = candidates[-1] if candidates else _keyframes[0]
     timeline_slider.set(target)
     show_frame_at(target)
     preview_time_lbl.config(text=f"{target:.3f}s  /  {_video_duration:.3f}s")
 
 def on_key(event):
+    ctrl = (event.state & 0x4) != 0
+    steps = 10 if ctrl else 1
     if event.keysym == "Right":
-        jump_to_keyframe(+1)
+        jump_to_keyframe(+1, steps)
     elif event.keysym == "Left":
-        jump_to_keyframe(-1)
+        jump_to_keyframe(-1, steps)
 
 def show_frame_at(pos_sec: float):
     """Extract a frame at pos_sec from the current source file and display it."""
@@ -373,7 +535,7 @@ def cancel_join():
         logging.info("Process cancelled by user")
     progress_bar.config(value=0)
     status_var.set("🚫  Cancelled — Ready")
-    btn_action.config(text="  ⛓  JOIN FILES (F6)  ", command=run_join,
+    btn_action.config(text="  ⛓  JOIN FILES  ", command=run_join,
                       bg="#2e7d32", fg="#000000", state="normal")
 
 def run_ffmpeg_with_progress(cmd, total_secs, on_done):
@@ -417,7 +579,7 @@ def run_ffmpeg_with_progress(cmd, total_secs, on_done):
                     pct = min(100, int(processed / total_secs * 100))
                     elapsed = int(time.time() - start_wall)
                     root.after(0, lambda p=pct, e=elapsed:
-                        status_var.set(f"⏳  {p}%  —  {e}s elapsed"))
+                        status_var.set(f"⏳  {p}% = {e}s elapsed"))
                     root.after(0, lambda p=pct: progress_bar.config(value=p))
 
             proc.wait()
@@ -523,7 +685,7 @@ def run_join():
     def on_done(success, info):
         os.unlink(list_file)
         progress_bar.config(value=100 if success else 0)
-        btn_action.config(text="  ⛓  JOIN FILES (F6)  ", command=run_join,
+        btn_action.config(text="  ⛓  JOIN FILES  ", command=run_join,
                           bg="#2e7d32", fg="#000000", state="normal")
         if success:
             status_var.set(f"✅  Done in {info}s  →  {os.path.basename(out_path)}")
@@ -712,12 +874,10 @@ def switch_mode(*_):
         preview_outer.pack(fill="x", padx=16, pady=(0,2))
         frame_cut.pack(fill="both", padx=16, pady=(0,2))
         btn_frame.pack_forget()
-        btn_frame.pack(pady=(4,6))
-        btn_action.config(text="  ✂  CUT & SAVE (F5)  ", command=run_cut,
+        btn_frame.pack(pady=(4,6), fill="x", padx=16)
+        btn_action.config(text="  ✂  CUT & SAVE  ", command=run_cut,
                           bg="#2e7d32", fg="#000000")
         timeline_slider.config(state="normal")
-        root.bind("<Left>",  on_key)
-        root.bind("<Right>", on_key)
     else:
         frame_cut.pack_forget()
         preview_outer.pack_forget()
@@ -725,12 +885,10 @@ def switch_mode(*_):
         nav_frame.pack_forget()
         frame_join.pack(fill="both", padx=16, pady=(0,4))
         btn_frame.pack_forget()
-        btn_frame.pack(pady=(4,6))
-        btn_action.config(text="  ⛓  JOIN FILES (F6)  ", command=run_join,
+        btn_frame.pack(pady=(4,6), fill="x", padx=16)
+        btn_action.config(text="  ⛓  JOIN FILES  ", command=run_join,
                           bg="#2e7d32", fg="#000000")
         timeline_slider.config(state="disabled")
-        root.unbind("<Left>")
-        root.unbind("<Right>")
     root.update_idletasks()
 
 # ════════════════════════════════════════════════════════════════
@@ -818,6 +976,7 @@ def browse_ffmpeg():
     update_ffmpeg_status()
 
 ffmpeg_gear_btn.config(command=browse_ffmpeg)
+tip(ffmpeg_gear_btn, "Click to set ffmpeg.exe path manually")
 
 update_ffmpeg_status()
 
@@ -827,18 +986,27 @@ mode_frame.pack(fill="x", padx=20, pady=(0,6))
 mode_inner = tk.Frame(mode_frame, bg=BG)
 mode_inner.pack(anchor="center")
 for val, label in [("cut", "✂  Cut Movie"), ("join", "⛓  Join Movie")]:
-    tk.Radiobutton(mode_inner, text=label, variable=var_mode, value=val,
+    rb = tk.Radiobutton(mode_inner, text=label, variable=var_mode, value=val,
                    command=switch_mode, bg=BG, fg=TEXT, selectcolor=ACCENT2,
                    activebackground=BG, activeforeground=ACCENT,
-                   font=FONT_RB, relief="flat", cursor="hand2").pack(side="left", padx=(0,20))
+                   font=FONT_RB, relief="flat", cursor="hand2")
+    rb.pack(side="left", padx=(0,20))
+    if val == "cut":
+        tip(rb, "F1 = Switch to Cut mode")
+    else:
+        tip(rb, "F2 = Switch to Join mode")
 
 # ── Prev / Next navigation (centered) ───────────────────────────
 nav_frame = tk.Frame(root, bg=BG)
 nav_frame.pack(fill="x", padx=16, pady=(0,2))
 nav_inner = tk.Frame(nav_frame, bg=BG)
 nav_inner.pack(anchor="center")
-make_btn(nav_inner, "◀ Prev", prev_file_in_folder, ACCENT2).pack(side="left", padx=(0,8))
-make_btn(nav_inner, "Next ▶", next_file_in_folder, ACCENT2).pack(side="left")
+btn_prev = make_btn(nav_inner, "◀ Prev", prev_file_in_folder, ACCENT2)
+btn_prev.pack(side="left", padx=(0,8))
+tip(btn_prev, "Page Up = Previous file in folder")
+btn_next = make_btn(nav_inner, "Next ▶", next_file_in_folder, ACCENT2)
+btn_next.pack(side="left")
+tip(btn_next, "Page Down = Next file in folder")
 
 # ════════════════════════════════════════════════════════════════
 # SHARED FILE PANEL (above preview, always visible)
@@ -856,7 +1024,9 @@ lbl_src_path = tk.Label(file_panel, text="—", bg=ENTRY_BG, fg=TEXT,
                          font=("Arial", 10), anchor="w", padx=6, pady=1,
                          relief="flat")
 lbl_src_path.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0,1))
-make_icon_btn(file_panel, "📂", browse_src, ACCENT2).grid(row=1, column=2, padx=(6,0), pady=(0,3))
+btn_browse_src = make_icon_btn(file_panel, "📂", browse_src, ACCENT2)
+btn_browse_src.grid(row=1, column=2, padx=(6,0), pady=(0,3))
+tip(btn_browse_src, "S = Open source video file")
 
 # Row 2: OUTPUT FOLDER label
 make_label(file_panel, "OUTPUT FOLDER").grid(row=2, column=0, columnspan=3, sticky="w", pady=(0,1))
@@ -866,7 +1036,9 @@ lbl_dest_path = tk.Label(file_panel, text="—", bg=ENTRY_BG, fg=TEXT,
                           font=("Arial", 10), anchor="w", padx=6, pady=1,
                           relief="flat")
 lbl_dest_path.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(0,2))
-make_icon_btn(file_panel, "📁", browse_dest, ACCENT2).grid(row=3, column=2, padx=(6,0), pady=(0,2))
+btn_browse_dest = make_icon_btn(file_panel, "📁", browse_dest, ACCENT2)
+btn_browse_dest.grid(row=3, column=2, padx=(6,0), pady=(0,2))
+tip(btn_browse_dest, "O = Set output folder")
 
 file_panel.columnconfigure(0, weight=1)
 
@@ -895,7 +1067,8 @@ timeline_outer = tk.Frame(preview_outer, bg=BG)
 timeline_outer.pack(fill="x", pady=(2,0))
 
 preview_time_lbl = tk.Label(timeline_outer, text="0.000s  /  0.000s",
-                             bg=BG, fg=MUTED, font=("Courier New", 8))
+                             bg=BG, fg=MUTED, font=("Courier New", 8),
+                             width=26, anchor="e")
 preview_time_lbl.pack(side="right", padx=(0,4))
 
 timeline_slider = tk.Scale(timeline_outer, from_=0, to=100, orient="horizontal",
@@ -904,6 +1077,7 @@ timeline_slider = tk.Scale(timeline_outer, from_=0, to=100, orient="horizontal",
                             troughcolor=ACCENT2, activebackground=ACCENT,
                             command=on_timeline_move)
 timeline_slider.pack(side="left", fill="x", expand=True)
+tip(timeline_slider, "Drag or click to scrub\n← → = Jump 1 keyframe\nCtrl+← → = Jump 10 keyframes\nHome = Set IN point\nEnd   = Set OUT point")
 
 def on_timeline_click(event):
     """Jump slider to clicked position on single click."""
@@ -925,9 +1099,6 @@ marker_canvas = tk.Canvas(preview_outer, height=22, bg=PANEL,
 marker_canvas.pack(fill="x", pady=(2,0))
 marker_canvas.bind("<Configure>", lambda e: draw_timeline_markers())
 
-tk.Label(preview_outer, text="←  drag slider or click to scrub  |  ← → keys jump keyframes",
-         bg=BG, fg=MUTED, font=("Courier New", 8)).pack(pady=(2,0))
-
 # ════════════════════════════════════════════════════════════════
 # CUT PANEL (time fields only)
 # ════════════════════════════════════════════════════════════════
@@ -945,14 +1116,22 @@ single_row.pack(side="left", expand=True, fill="x")
 
 make_label(single_row, "START").pack(side="left", padx=(0,4))
 make_entry(single_row, var_start, width=14).pack(side="left")
-make_btn(single_row, "Start", set_start_zero, "#2e7d32").pack(side="left", padx=(6,2))
-make_btn(single_row, "🚫", reset_start, "#b84c00").pack(side="left", padx=(0,10))
+btn_set_start = make_btn(single_row, "Start", set_start_zero, "#2e7d32")
+btn_set_start.pack(side="left", padx=(6,2))
+tip(btn_set_start, "Home = Set IN point to current position")
+btn_reset_start = make_btn(single_row, "🚫", reset_start, "#b84c00")
+btn_reset_start.pack(side="left", padx=(0,10))
+tip(btn_reset_start, "Reset start time to 00:00:00.000")
 
 tk.Label(single_row, text="→", bg=PANEL, fg=ACCENT,
          font=("Courier New", 16, "bold")).pack(side="left", padx=(0,10))
 
-make_btn(single_row, "End", set_end_duration, "#b84c00").pack(side="left", padx=(0,2))
-make_btn(single_row, "🚫", reset_end, ACCENT2).pack(side="left", padx=(0,6))
+btn_set_end = make_btn(single_row, "End", set_end_duration, "#b84c00")
+btn_set_end.pack(side="left", padx=(0,2))
+tip(btn_set_end, "End = Set OUT point to current position")
+btn_reset_end = make_btn(single_row, "🚫", reset_end, ACCENT2)
+btn_reset_end.pack(side="left", padx=(0,6))
+tip(btn_reset_end, "Clear end time")
 make_entry(single_row, var_end, width=14).pack(side="left")
 make_label(single_row, "END").pack(side="left", padx=(4,0))
 
@@ -968,15 +1147,17 @@ make_label(frame_join, "FILE 1").grid(row=0, column=0, columnspan=3, sticky="w",
 lbl_join1 = tk.Label(frame_join, text="—", bg=ENTRY_BG, fg=TEXT,
                       font=("Arial", 10), anchor="w", padx=6, pady=1, relief="flat")
 lbl_join1.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0,1))
-make_icon_btn(frame_join, "📂", lambda: browse_join(var_join1, lbl_join1), ACCENT2).grid(
-    row=1, column=2, padx=(6,0), pady=(0,3))
+btn_join1 = make_icon_btn(frame_join, "📂", lambda: browse_join(var_join1, lbl_join1), ACCENT2)
+btn_join1.grid(row=1, column=2, padx=(6,0), pady=(0,3))
+tip(btn_join1, "1 = Open File 1")
 
 make_label(frame_join, "FILE 2").grid(row=2, column=0, columnspan=3, sticky="w", pady=(0,1))
 lbl_join2 = tk.Label(frame_join, text="—", bg=ENTRY_BG, fg=TEXT,
                       font=("Arial", 10), anchor="w", padx=6, pady=1, relief="flat")
 lbl_join2.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(0,1))
-make_icon_btn(frame_join, "📂", lambda: browse_join(var_join2, lbl_join2), ACCENT2).grid(
-    row=3, column=2, padx=(6,0), pady=(0,3))
+btn_join2 = make_icon_btn(frame_join, "📂", lambda: browse_join(var_join2, lbl_join2), ACCENT2)
+btn_join2.grid(row=3, column=2, padx=(6,0), pady=(0,3))
+tip(btn_join2, "2 = Open File 2")
 
 tk.Label(frame_join, text="Output is saved as  _joined01.mp4  next to File 1.",
          bg=PANEL, fg=MUTED, font=("Courier New", 8)).grid(
@@ -986,11 +1167,13 @@ tk.Frame(frame_join, bg=ACCENT2, height=1).grid(row=5, column=0, columnspan=3, s
 
 cb_frame = tk.Frame(frame_join, bg=PANEL)
 cb_frame.grid(row=6, column=0, columnspan=3, sticky="w")
-tk.Checkbutton(cb_frame, text="Re-Encode  (seamless join, slower — enables options below)",
+cb_reencode = tk.Checkbutton(cb_frame, text="Re-Encode  (seamless join, slower — enables options below)",
                variable=var_reencode, bg=PANEL, fg=TEXT, selectcolor=ACCENT2,
                activebackground=PANEL, activeforeground=ACCENT,
                font=("Courier New", 9, "bold"), cursor="hand2",
-               command=toggle_crf).pack(side="left")
+               command=toggle_crf)
+cb_reencode.pack(side="left")
+tip(cb_reencode, "R = Toggle Re-Encode on/off")
 
 enc_frame = tk.Frame(frame_join, bg=PANEL)
 enc_frame.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(4,1))
@@ -1003,6 +1186,7 @@ encoder_menu.config(bg=ENTRY_BG, fg=TEXT, font=("Courier New", 9),
 encoder_menu["menu"].config(bg=ENTRY_BG, fg=TEXT, font=("Courier New", 9),
                               activebackground=ACCENT2)
 encoder_menu.pack(side="left", padx=(8,0), fill="x", expand=True)
+tip(encoder_menu, "E = Open encoder dropdown\n(only active when Re-Encode is enabled)")
 
 crf_frame = tk.Frame(frame_join, bg=PANEL)
 crf_frame.grid(row=8, column=0, columnspan=3, sticky="ew", pady=(2,2))
@@ -1014,6 +1198,7 @@ crf_slider = tk.Scale(crf_frame, from_=0, to=51, orient="horizontal",
                       troughcolor=ACCENT2, activebackground=ACCENT,
                       font=("Courier New", 8), showvalue=True, state="disabled")
 crf_slider.pack(side="left", padx=(8,8))
+tip(crf_slider, "Q = Focus slider, then use ↑ ↓ to adjust\n(only active when Re-Encode is enabled)")
 tk.Label(crf_frame, text="0=lossless  18=very good  23=good  51=low",
          bg=PANEL, fg=MUTED, font=("Courier New", 7)).pack(side="left")
 
@@ -1027,10 +1212,21 @@ toggle_crf()
 
 # ── Action button ────────────────────────────────────────────────
 btn_frame = tk.Frame(root, bg=BG)
-btn_frame.pack(pady=(4,6))
-btn_action = make_btn(btn_frame, "  ✂  CUT & SAVE (F5)  ", run_cut, color="#2e7d32")
+btn_frame.pack(pady=(4,6), fill="x", padx=16)
+
+# Left spacer — same width as shortcut label on the right
+btn_left_spacer = tk.Frame(btn_frame, bg=BG, width=80)
+btn_left_spacer.pack(side="left")
+btn_left_spacer.pack_propagate(False)
+
+# Center: button fills remaining space and centers itself
+btn_center = tk.Frame(btn_frame, bg=BG)
+btn_center.pack(side="left", expand=True, fill="x")
+
+btn_action = make_btn(btn_center, "  ✂  CUT & SAVE  ", run_cut, color="#2e7d32")
 btn_action.config(fg="#000000")
 btn_action.pack(ipadx=10, ipady=3)
+tip(btn_action, "F5 = Cut & Save\nF6 = Join Files")
 
 # ── Status bar + Progressbar ─────────────────────────────────────
 status_bar = tk.Frame(root, bg=ACCENT2, height=28)
@@ -1051,10 +1247,67 @@ tk.Label(status_bar, textvariable=status_var, bg=ACCENT2, fg=TEXT,
          font=("Courier New", 9), anchor="w").pack(side="left", padx=12, pady=4)
 
 # ── Keyboard shortcuts ───────────────────────────────────────────
-root.bind("<Left>",  on_key)
-root.bind("<Right>", on_key)
-root.bind("<F5>", lambda e: run_cut())
-root.bind("<F6>", lambda e: run_join())
+def _is_cut():
+    return var_mode.get() == "cut"
+
+def _is_join():
+    return var_mode.get() == "join"
+
+def _on_global_key(event):
+    # Ignore when typing in an Entry widget
+    if isinstance(event.widget, tk.Entry):
+        return
+    k = event.keysym
+    ctrl = (event.state & 0x4) != 0
+
+    # ── Global ───────────────────────────────────────
+    if k == "F1":
+        var_mode.set("cut");  switch_mode(); return
+    if k == "F2":
+        var_mode.set("join"); switch_mode(); return
+    if k == "F5":
+        run_cut();  return
+    if k == "F6":
+        run_join(); return
+
+    # ── Cut-side only ────────────────────────────────
+    if _is_cut():
+        if k == "Home":
+            set_start_zero();        return
+        if k == "End":
+            set_end_duration();      return
+        if k == "Prior":
+            prev_file_in_folder();   return  # PageUp
+        if k == "Next":
+            next_file_in_folder();   return  # PageDown
+        if k == "s":
+            browse_src();            return
+        if k == "o":
+            browse_dest();           return
+        if k in ("Right", "Left"):
+            steps = 10 if ctrl else 1
+            jump_to_keyframe(+1 if k == "Right" else -1, steps)
+            return
+
+    # ── Join-side only ───────────────────────────────
+    if _is_join():
+        if k == "1":
+            browse_join(var_join1, lbl_join1); return
+        if k == "2":
+            browse_join(var_join2, lbl_join2); return
+        if k == "r":
+            var_reencode.set(not var_reencode.get())
+            toggle_crf();            return
+        if k == "e":
+            if var_reencode.get():
+                encoder_menu.event_generate("<ButtonPress-1>")
+            return
+        if k == "q":
+            if var_reencode.get():
+                crf_slider.focus_set()
+            return
+
+root.bind("<Key>", _on_global_key)
 
 # ── Window position ──────────────────────────────────────────────
 def set_window_position():
