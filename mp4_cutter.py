@@ -118,8 +118,8 @@ class Tooltip:
         "1              = Open File 1",
         "2              = Open File 2",
         "R              = Toggle Re-Encode",
-        "E              = Open Encoder dropdown",
-        "Q              = Focus CRF slider",
+        "E              = Focus Encoder dropdown, then ↑ ↓",
+        "Q              = Focus CRF slider, then + / -",
     ]
 
     def __init__(self, widget):
@@ -1188,7 +1188,7 @@ encoder_menu.config(bg=ENTRY_BG, fg=TEXT, font=("Courier New", 9),
 encoder_menu["menu"].config(bg=ENTRY_BG, fg=TEXT, font=("Courier New", 9),
                               activebackground=ACCENT2)
 encoder_menu.pack(side="left", padx=(8,0), fill="x", expand=True)
-tip(encoder_menu, "E = Open encoder dropdown\n(only active when Re-Encode is enabled)")
+tip(encoder_menu, "E = Focus encoder dropdown, then ↑ ↓ to select\n(only active when Re-Encode is enabled)")
 
 crf_frame = tk.Frame(frame_join, bg=PANEL)
 crf_frame.grid(row=8, column=0, columnspan=3, sticky="ew", pady=(2,2))
@@ -1200,7 +1200,7 @@ crf_slider = tk.Scale(crf_frame, from_=0, to=51, orient="horizontal",
                       troughcolor=ACCENT2, activebackground=ACCENT,
                       font=("Courier New", 8), showvalue=True, state="disabled")
 crf_slider.pack(side="left", padx=(8,8))
-tip(crf_slider, "Q = Focus slider, then use ↑ ↓ to adjust\n(only active when Re-Encode is enabled)")
+tip(crf_slider, "Q = Focus slider, then + / - to adjust\n(only active when Re-Encode is enabled)")
 tk.Label(crf_frame, text="0=lossless  18=very good  23=good  51=low",
          bg=PANEL, fg=MUTED, font=("Courier New", 7)).pack(side="left")
 
@@ -1293,11 +1293,20 @@ def _on_global_key(event):
             toggle_crf();            return
         if k == "e":
             if var_reencode.get():
-                encoder_menu.event_generate("<ButtonPress-1>")
+                encoder_menu.focus_set()
+                encoder_menu.event_generate("<space>")
             return
         if k == "q":
             if var_reencode.get():
                 crf_slider.focus_set()
+            return
+        if k in ("plus", "equal"):          # + = CRF rauf (höherer Wert)
+            if var_reencode.get():
+                var_crf.set(min(51, var_crf.get() + 1))
+            return
+        if k == "minus":                    # - = CRF runter (niedrigerer Wert)
+            if var_reencode.get():
+                var_crf.set(max(0, var_crf.get() - 1))
             return
 
 root.bind("<Key>", _on_global_key)
