@@ -1214,16 +1214,7 @@ toggle_crf()
 btn_frame = tk.Frame(root, bg=BG)
 btn_frame.pack(pady=(4,6), fill="x", padx=16)
 
-# Left spacer — same width as shortcut label on the right
-btn_left_spacer = tk.Frame(btn_frame, bg=BG, width=80)
-btn_left_spacer.pack(side="left")
-btn_left_spacer.pack_propagate(False)
-
-# Center: button fills remaining space and centers itself
-btn_center = tk.Frame(btn_frame, bg=BG)
-btn_center.pack(side="left", expand=True, fill="x")
-
-btn_action = make_btn(btn_center, "  ✂  CUT & SAVE  ", run_cut, color="#2e7d32")
+btn_action = make_btn(btn_frame, "  ✂  CUT & SAVE  ", run_cut, color="#2e7d32")
 btn_action.config(fg="#000000")
 btn_action.pack(ipadx=10, ipady=3)
 tip(btn_action, "F5 = Cut & Save\nF6 = Join Files")
