@@ -1,4 +1,4 @@
-APP_VERSION = "1.9"
+APP_VERSION = "2.0"
 
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -146,6 +146,7 @@ class Tooltip:
                      font=("Courier New", 9), anchor="w", padx=10, pady=1
                      ).pack(fill="x")
         self._start_poll()
+        self.widget.after(3000, self._destroy)
 
     def _start_poll(self):
         if not self.tip_win:
@@ -211,6 +212,7 @@ class SimpleTooltip:
                      ).pack(fill="x")
         SimpleTooltip._active.append(self)
         self._start_poll()
+        self.widget.after(3000, self._destroy)
 
     def _start_poll(self):
         """Poll every 200ms — destroy if mouse has left both widget and tooltip."""
